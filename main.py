@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 import submitit
-
+import torch
 from ocpmodels.common import distutils
 from ocpmodels.common.flags import flags
 from ocpmodels.common.registry import registry
@@ -89,6 +89,18 @@ class Runner(submitit.helpers.Checkpointable):
                 ), "Relax dataset is required for making predictions"
                 assert config["checkpoint"]
                 trainer.run_relaxations()
+
+            # If "export" is specified, export the PyTorch weights/biases and optimizer state via pickling torch.save()
+            elif config["mode"] == "export":
+                # Check model existence for export
+                assert (
+                    trainer.model is not None
+                ), "A model needs to exist to export model"
+                assert config[
+                    "checkpoint"
+                ], "A checkpoint needs to exist to export model"
+                print(trainer.model.module)
+                trainer.export()
 
             distutils.synchronize()
 

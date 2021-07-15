@@ -14,15 +14,13 @@ from collections import OrderedDict, defaultdict
 from pathlib import Path
 
 import numpy as np
-import torch
-import torch.nn as nn
-import torch.optim as optim
 import yaml
-from ray import tune
-from torch.nn.parallel.distributed import DistributedDataParallel
 from tqdm import tqdm
 
 import ocpmodels
+import torch
+import torch.nn as nn
+import torch.optim as optim
 from ocpmodels.common import distutils
 from ocpmodels.common.data_parallel import OCPDataParallel
 from ocpmodels.common.logger import TensorboardLogger, WandBLogger
@@ -38,6 +36,8 @@ from ocpmodels.common.utils import (
 from ocpmodels.modules.evaluator import Evaluator
 from ocpmodels.modules.normalizer import Normalizer
 from ocpmodels.modules.scheduler import LRScheduler
+from ray import tune
+from torch.nn.parallel.distributed import DistributedDataParallel
 
 
 @registry.register_trainer("base")
@@ -165,6 +165,28 @@ class BaseTrainer(ABC):
         self.load_criterion()
         self.load_optimizer()
         self.load_extras()
+
+    # Export state of the model and state of the corresponding optimizer via torch.save() functionality
+    def export(self):
+        # File directories for logs and results are already automatically made by the base_trainer.py class
+        # Take advantage of this by saving model state to results_dir folder.
+        exportModelFileName = (
+            self.config["model"] + "_" + self.config["cmd"]["timestamp"]
+        )
+        exportModelFilePath = os.path.join(
+            self.config["cmd"]["results_dir"], exportModelFileName
+        )
+        exportOptimizerFileName = (
+            self.config["optim"].get("optimizer", "AdamW")
+            + "_"
+            + self.config["cmd"]["timestamp"]
+        )
+        exportOptimizerFilePath = os.path.join(
+            self.config["cmd"]["results_dir"], exportOptimizerFileName
+        )
+
+        torch.save(self.model.module.state_dict(), exportModelFilePath)
+        torch.save(self.model.module.state_dict(), exportOptimizerFilePath)
 
     # Note: this function is now deprecated. We build config outside of trainer.
     # See build_config in ocpmodels.common.utils.py.

@@ -23,9 +23,9 @@ class Flags:
         self.parser.add_argument_group("Core Arguments")
         self.parser.add_argument(
             "--mode",
-            choices=["train", "predict", "run-relaxations"],
+            choices=["train", "predict", "run-relaxations", "export"],
             required=True,
-            help="Whether to train the model, make predictions, or to run relaxations",
+            help="Whether to train the model, make predictions, run relaxations, or export the model",
         )
         self.parser.add_argument(
             "--config-yml",

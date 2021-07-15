@@ -3,14 +3,14 @@ trainer: forces
 # The minimum database parameters here must match the same corresponding minimum database parameters in custom .yml files.
 dataset:
     # Training data, must match custom .yml file outside of the base .yml file.
-  - src: /media/cameron/DATA/ocp/data/s2ef/200k/train_prototype
+  - src: data/s2ef/200k/train_prototype
     normalize_labels: True
     target_mean: -0.7554450631141663
     target_std: 2.887317180633545
     grad_target_mean: 0.0
     grad_target_std: 2.887317180633545
     # Validation data, must match custom .yml file outside of the base.yml file.
-#  - src: data/s2ef/s2ef_test_lmdbs/test_data/s2ef/all/test_ood_both/
+#  - src: data/s2ef/200k/train_prototype
 
 logger: tensorboard
 

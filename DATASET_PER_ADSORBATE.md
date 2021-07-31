@@ -84,13 +84,13 @@ Download links are in the table below:
 
 Note - A few adsorbates are intentionally left out for the test splits.
 
-Downloading any of the above and extracting will result in a folder : 
+Downloading any of the above and extracting will result in a folder :
 
 `<index>/`
 
 * `system.txt` Text file containing information about the different adsorbate+catalyst system names. In total there are N systems. More details described below.
-* `<index>/` 
-    * This contains N compressed trajectory files of the format `.extxyz.xz`. 
+* `<index>/`
+    * This contains N compressed trajectory files of the format `.extxyz.xz`.
     * Files are named as  `<system_id>.extxyz.xz` (where `system_id` is defined below).
 
 

@@ -1,3 +1,18 @@
+import torch
+import torch.nn as nn
+from torch_geometric.nn import MessagePassing, global_mean_pool, radius_graph
+from torch_geometric.nn.models.schnet import GaussianSmearing
+
+from ocpmodels.common.registry import registry
+from ocpmodels.common.utils import (
+    conditional_grad,
+    get_pbc_distances,
+    radius_graph_pbc,
+)
+from ocpmodels.datasets.embeddings import KHOT_EMBEDDINGS
+from ocpmodels.models.base import BaseModel
+
+
 """
 Copyright (c) Facebook, Inc. and its affiliates.
 
@@ -12,20 +27,6 @@ The dropout rate dropout_rate is applied to each fully connected layer in the CG
 i.e. dropout_rate = 0.30 means any neuron in any fully connected layer has a 30% chance of being dropped.
 This is equivalent to saying, "About 30% of neurons in any given fully connected layer will be dropped."
 """
-
-import torch
-import torch.nn as nn
-from torch_geometric.nn import MessagePassing, global_mean_pool, radius_graph
-from torch_geometric.nn.models.schnet import GaussianSmearing
-
-from ocpmodels.common.registry import registry
-from ocpmodels.common.utils import (
-    conditional_grad,
-    get_pbc_distances,
-    radius_graph_pbc,
-)
-from ocpmodels.datasets.embeddings import KHOT_EMBEDDINGS
-from ocpmodels.models.base import BaseModel
 
 
 @registry.register_model("cgcnn_dropout")
@@ -65,6 +66,8 @@ class CGCNN(BaseModel):
             (default: False)
         dropout_rate (float16): Probably of dropping a neuron in any given fully connected layer.
             (default: 0.00)
+        dropout_on_inference (bool): Whether or not to drop nodes post-training on predictions.
+            (default: False)
     """
 
     def __init__(
@@ -83,19 +86,20 @@ class CGCNN(BaseModel):
         num_gaussians=50,
         use_dropout=False,
         dropout_rate=0.00,
-        
+        dropout_on_inference=False,
     ):
         super(CGCNN, self).__init__(num_atoms, bond_feat_dim, num_targets)
         self.regress_forces = regress_forces
         self.use_pbc = use_pbc
         self.cutoff = cutoff
         self.otf_graph = otf_graph
-        
+
         # Apply custom dropout arguments passed to __init__ onto custom CGCNN class attributes
         # Now, they are officially a part of the CGCNN class.
         self.use_dropout = use_dropout
         self.dropout_rate = dropout_rate
-        
+        self.dropout_on_inference = False
+
         # Get CGCNN atom embeddings
         self.embedding = torch.zeros(100, 92)
         for i in range(100):
@@ -116,7 +120,7 @@ class CGCNN(BaseModel):
         self.conv_to_fc = nn.Sequential(
             nn.Linear(atom_embedding_size, fc_feat_size), nn.Softplus()
         )
-        
+
         # If dropout is specified via use_dropout = True
         if self.use_dropout:
             if num_fc_layers > 1:
@@ -124,7 +128,9 @@ class CGCNN(BaseModel):
                 for _ in range(num_fc_layers - 1):
                     layers.append(nn.Linear(fc_feat_size, fc_feat_size))
                     # Add dropout here with dropout rate stored in dropout_rate
-                    layers.append(torch.nn.Dropout(p = self.dropout_rate, inplace = False))
+                    layers.append(
+                        torch.nn.Dropout(p=self.dropout_rate, inplace=False)
+                    )
                     layers.append(nn.Softplus())
                 self.fcs = nn.Sequential(*layers)
 
@@ -136,13 +142,15 @@ class CGCNN(BaseModel):
                     layers.append(nn.Linear(fc_feat_size, fc_feat_size))
                     layers.append(nn.Softplus())
                 self.fcs = nn.Sequential(*layers)
-        
+
         # self.fc_out refers to the final fully-connected layer that connects to the target variables
         # If dropout is specified via use_dropout = True
         if self.use_dropout:
             fc_out_layers = []
             fc_out_layers.append(nn.Linear(fc_feat_size, self.num_targets))
-            fc_out_layers.append(torch.nn.Dropout(p = dropout_rate, inplace = False))
+            fc_out_layers.append(
+                torch.nn.Dropout(p=dropout_rate, inplace=False)
+            )
             self.fc_out = nn.Sequential(*fc_out_layers)
 
         # If dropout is specified via use_dropout = False

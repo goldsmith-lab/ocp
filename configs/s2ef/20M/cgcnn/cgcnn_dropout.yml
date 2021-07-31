@@ -11,7 +11,8 @@ model:
   num_gaussians: 100
   use_pbc: True
   use_dropout: True
-  dropout_rate: 0.30
+  dropout_rate: 0.00
+  dropout_on_inference: False
 
 # *** Important note ***
 #   The total number of gpus used for this run was 48.

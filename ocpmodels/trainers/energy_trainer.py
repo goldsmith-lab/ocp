@@ -10,8 +10,8 @@ from collections import defaultdict
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, DistributedSampler
 import torch_geometric
+from torch.utils.data import DataLoader, DistributedSampler
 from tqdm import tqdm
 
 from ocpmodels.common import distutils
@@ -199,7 +199,23 @@ class EnergyTrainer(BaseTrainer):
         if isinstance(loader, torch_geometric.data.Batch):
             loader = [[loader]]
 
+        # Set model to evaluation mode for predictions
         self.model.eval()
+
+        # If dropout_on_inference = True, turn the dropout layers on to use dropout on prediction.
+        # dropout_on_inference is defined in the model section of config.yml files. Otherwise it defaults to False.
+        # For every layer in the PyTorch model
+        if self.config["model_attributes"].get("dropout_on_inference", False):
+            for module in self.model.modules():
+                # Layers are custom classes. If the custom class has the name "Dropout",
+                if module.__class__.__name__.startswith("Dropout"):
+                    print("DROPOUT LAYER ENABLED IN PREDICTION")
+                    # Set that layer to training mode.
+                    # Note that dropout layers in PyTorch (nn.Dropout()) are only activated in training mode.
+                    # Otherwise they are disabled in evaluation mode (model.eval())
+                    # So if we wanted to use the dropout layers outside of training, we just manually reset them to training mode again.
+                    module.train()
+
         if self.normalizers is not None and "target" in self.normalizers:
             self.normalizers["target"].to(self.device)
         predictions = {"id": [], "energy": []}

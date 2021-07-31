@@ -11,8 +11,8 @@ model:
   num_gaussians: 100
   use_pbc: True
   use_dropout: True
-  dropout_rate: 0.30
-
+  dropout_rate: 0.00
+  dropout_on_inference: False
 
 # *** Important note ***
 #   The total number of gpus used for this run was 4.
@@ -33,20 +33,3 @@ optim:
   warmup_factor: 0.2
   max_epochs: 50
   force_coefficient: 10
-
-#trainer: forces # Use the ForcesTrainer
-
-#dataset:
-  # Training data
-#- src: data/s2ef/25k/train
-#  normalize_labels: True
-  # Mean and standard deviation of energies
-#  target_mean: -0.7586356401443481
-#  target_std: 2.981738567352295
-  # Mean and standard deviation of forces
-#  grad_target_mean: 0.0
-#  grad_target_std: 2.981738567352295
-  # Val data (optional)
-#- src: data/s2ef/all/val_ood_both/
-  # Test data (optional)
-#- src: data/s2ef/s2ef_test_lmdbs/test_data/s2ef/all/test_ood_both/

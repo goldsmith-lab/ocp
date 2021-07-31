@@ -1,3 +1,14 @@
+import torch
+from ase import Atoms
+from ase.calculators.calculator import Calculator
+from ase.calculators.singlepoint import SinglePointCalculator as sp
+from ase.constraints import FixAtoms
+
+from ocpmodels.common.utils import radius_graph_pbc
+from ocpmodels.datasets.trajectory_lmdb import data_list_collater
+from ocpmodels.preprocessing import AtomsToGraphs
+
+
 """
 Copyright (c) Facebook, Inc. and its affiliates.
 
@@ -9,15 +20,6 @@ LICENSE file in the root directory of this source tree.
 Utilities to interface OCP models/trainers with the Atomic Simulation
 Environment (ASE)
 """
-import torch
-from ase import Atoms
-from ase.calculators.calculator import Calculator
-from ase.calculators.singlepoint import SinglePointCalculator as sp
-from ase.constraints import FixAtoms
-
-from ocpmodels.common.utils import radius_graph_pbc
-from ocpmodels.datasets.trajectory_lmdb import data_list_collater
-from ocpmodels.preprocessing import AtomsToGraphs
 
 
 def batch_to_atoms(batch):

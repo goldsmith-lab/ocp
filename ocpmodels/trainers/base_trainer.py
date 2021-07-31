@@ -14,13 +14,15 @@ from collections import OrderedDict, defaultdict
 from pathlib import Path
 
 import numpy as np
-import yaml
-from tqdm import tqdm
-
-import ocpmodels
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import yaml
+from ray import tune
+from torch.nn.parallel.distributed import DistributedDataParallel
+from tqdm import tqdm
+
+import ocpmodels
 from ocpmodels.common import distutils
 from ocpmodels.common.data_parallel import OCPDataParallel
 from ocpmodels.common.logger import TensorboardLogger, WandBLogger
@@ -36,8 +38,6 @@ from ocpmodels.common.utils import (
 from ocpmodels.modules.evaluator import Evaluator
 from ocpmodels.modules.normalizer import Normalizer
 from ocpmodels.modules.scheduler import LRScheduler
-from ray import tune
-from torch.nn.parallel.distributed import DistributedDataParallel
 
 
 @registry.register_trainer("base")

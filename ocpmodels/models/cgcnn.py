@@ -66,6 +66,7 @@ class CGCNN(BaseModel):
         otf_graph=False,
         cutoff=6.0,
         num_gaussians=50,
+        latent_layer=[],
     ):
         super(CGCNN, self).__init__(num_atoms, bond_feat_dim, num_targets)
         self.regress_forces = regress_forces
@@ -104,6 +105,7 @@ class CGCNN(BaseModel):
 
         self.cutoff = cutoff
         self.distance_expansion = GaussianSmearing(0.0, cutoff, num_gaussians)
+        self.latent_layer = latent_layer
 
     @conditional_grad(torch.enable_grad())
     def _forward(self, data):
@@ -142,18 +144,18 @@ class CGCNN(BaseModel):
 
         data.edge_attr = self.distance_expansion(distances)
         # Forward pass through the network
-        mol_feats = self._convolve(data)
+        mol_feats, latent_feats = self._convolve(data)
         mol_feats = self.conv_to_fc(mol_feats)
         if hasattr(self, "fcs"):
             mol_feats = self.fcs(mol_feats)
 
         energy = self.fc_out(mol_feats)
-        return energy
+        return energy, latent_feats
 
     def forward(self, data):
         if self.regress_forces:
             data.pos.requires_grad_(True)
-        energy = self._forward(data)
+        energy, latent_feats = self._forward(data)
 
         if self.regress_forces:
             forces = -1 * (
@@ -164,9 +166,9 @@ class CGCNN(BaseModel):
                     create_graph=True,
                 )[0]
             )
-            return energy, forces
+            return energy, forces, latent_feats
         else:
-            return energy
+            return energy, latent_feats
 
     def _convolve(self, data):
         """
@@ -174,10 +176,13 @@ class CGCNN(BaseModel):
         into the dense layers.
         """
         node_feats = self.embedding_fc(data.x)
-        for f in self.convs:
+        latent_feats = None
+        for i, f in enumerate(self.convs):
             node_feats = f(node_feats, data.edge_index, data.edge_attr)
+            if i in self.latent_layer:
+                latent_feats = node_feats
         mol_feats = global_mean_pool(node_feats, data.batch)
-        return mol_feats
+        return mol_feats, latent_feats
 
 
 class CGCNNConv(MessagePassing):

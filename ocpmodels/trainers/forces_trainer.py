@@ -296,7 +296,13 @@ class ForcesTrainer(BaseTrainer):
             self.normalizers["target"].to(self.device)
             self.normalizers["grad_target"].to(self.device)
 
-        predictions = {"id": [], "energy": [], "forces": [], "chunk_idx": []}
+        predictions = {
+            "id": [],
+            "energy": [],
+            "forces": [],
+            "chunk_idx": [],
+            "latent": [],
+        }
 
         for i, batch_list in tqdm(
             enumerate(data_loader),
@@ -335,6 +341,17 @@ class ForcesTrainer(BaseTrainer):
                 per_image_forces = [
                     force.numpy() for force in per_image_forces
                 ]
+                latent = []
+                if "latent" in out:
+                    latent = out["latent"].cpu().detach().to(torch.float16)
+                    per_image_latents = torch.split(
+                        latent, batch_natoms.tolist()
+                    )
+                    per_image_latents = [
+                        latent.numpy() for latent in per_image_latents
+                    ]
+                    predictions["latent"].extend(per_image_latents)
+
                 # evalAI only requires forces on free atoms
                 if results_file is not None:
                     _per_image_fixed = torch.split(
@@ -364,6 +381,8 @@ class ForcesTrainer(BaseTrainer):
         predictions["chunk_idx"] = np.array(predictions["chunk_idx"])
         predictions["energy"] = np.array(predictions["energy"])
         predictions["id"] = np.array(predictions["id"])
+        predictions["latent"] = np.array(predictions["latent"])
+
         self.save_results(
             predictions, results_file, keys=["energy", "forces", "chunk_idx"]
         )
@@ -526,9 +545,9 @@ class ForcesTrainer(BaseTrainer):
     def _forward(self, batch_list):
         # forward pass.
         if self.config["model_attributes"].get("regress_forces", True):
-            out_energy, out_forces = self.model(batch_list)
+            out_energy, out_forces, out_feats = self.model(batch_list)
         else:
-            out_energy = self.model(batch_list)
+            out_energy, out_feats = self.model(batch_list)
 
         if out_energy.shape[-1] == 1:
             out_energy = out_energy.view(-1)
@@ -539,6 +558,9 @@ class ForcesTrainer(BaseTrainer):
 
         if self.config["model_attributes"].get("regress_forces", True):
             out["forces"] = out_forces
+
+        if out_feats is not None:
+            out["latent"] = out_feats
 
         return out
 

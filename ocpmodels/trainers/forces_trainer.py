@@ -326,13 +326,7 @@ class ForcesTrainer(BaseTrainer):
                 if "latent" in out:
                     per_image_latents = [[] for _ in range(len(batch_natoms))]
                     for i, layer in enumerate(out["latent"]):
-                        layer = layer.cpu().detach().to(torch.float16)
-                        per_image_layer_latents = torch.split(
-                            layer, batch_natoms.tolist()
-                        )
-                        for im_num, im_lats in enumerate(
-                            per_image_layer_latents
-                        ):
+                        for im_num, im_lats in enumerate(layer):
                             per_image_latents[im_num].append(np.array(im_lats))
                     predictions["latent"].extend(per_image_latents)
 

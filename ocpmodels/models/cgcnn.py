@@ -67,7 +67,7 @@ class CGCNN(BaseModel):
         cutoff=6.0,
         num_gaussians=50,
         latent_layers=[],
-        latent_funcs=[],
+        latent_proc=None,
     ):
         super(CGCNN, self).__init__(num_atoms, bond_feat_dim, num_targets)
         self.regress_forces = regress_forces
@@ -107,6 +107,7 @@ class CGCNN(BaseModel):
         self.cutoff = cutoff
         self.distance_expansion = GaussianSmearing(0.0, cutoff, num_gaussians)
         self.latent_layers = latent_layers
+        self.latent_proc = latent_proc
 
     @conditional_grad(torch.enable_grad())
     def _forward(self, data):
@@ -181,7 +182,11 @@ class CGCNN(BaseModel):
         for i, f in enumerate(self.convs):
             node_feats = f(node_feats, data.edge_index, data.edge_attr)
             if i in self.latent_layers:
-                latent_feats.append(node_feats)
+                latents = node_feats
+                if self.latent_proc:
+                    latents = torch.split(latents, data.natoms.tolist())
+                    latents = self.latent_proc(latents)
+                latent_feats.append(latents)
         mol_feats = global_mean_pool(node_feats, data.batch)
         return mol_feats, latent_feats
 

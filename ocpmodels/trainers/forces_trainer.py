@@ -323,15 +323,17 @@ class ForcesTrainer(BaseTrainer):
                 per_image_forces = [
                     force.numpy() for force in per_image_forces
                 ]
-                latent = []
                 if "latent" in out:
-                    latent = out["latent"].cpu().detach().to(torch.float16)
-                    per_image_latents = torch.split(
-                        latent, batch_natoms.tolist()
-                    )
-                    per_image_latents = [
-                        latent.numpy() for latent in per_image_latents
-                    ]
+                    per_image_latents = [[] for _ in range(len(batch_natoms))]
+                    for i, layer in enumerate(out["latent"]):
+                        layer = layer.cpu().detach().to(torch.float16)
+                        per_image_layer_latents = torch.split(
+                            layer, batch_natoms.tolist()
+                        )
+                        for im_num, im_lats in enumerate(
+                            per_image_layer_latents
+                        ):
+                            per_image_latents[im_num].append(np.array(im_lats))
                     predictions["latent"].extend(per_image_latents)
 
                 # evalAI only requires forces on free atoms

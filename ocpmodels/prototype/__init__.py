@@ -1,5 +1,5 @@
 __all__ = [
-    "LatentProcessor",
+    "ConvLayerProcessor",
 ]
 
-from .latent_features import LatentProcessor
+from .latent_features import ConvLayerProcessor

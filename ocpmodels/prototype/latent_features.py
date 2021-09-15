@@ -8,7 +8,7 @@ DEFAULT_METRICS = [
 ]
 
 
-class LatentProcessor:
+class ConvLayerProcessor:
     def __init__(self, metrics=DEFAULT_METRICS):
         self.metrics = metrics
         self.funcs = {

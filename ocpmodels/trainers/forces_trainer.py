@@ -355,11 +355,11 @@ class ForcesTrainer(BaseTrainer):
                 predictions["forces"] = out["forces"].detach()
                 return predictions
 
-        predictions["forces"] = np.array(predictions["forces"])
+        predictions["forces"] = np.array(predictions["forces"], dtype=object)
         predictions["chunk_idx"] = np.array(predictions["chunk_idx"])
         predictions["energy"] = np.array(predictions["energy"])
         predictions["id"] = np.array(predictions["id"])
-        predictions["latent"] = np.array(predictions["latent"])
+        predictions["latent"] = np.array(predictions["latent"], dtype=object)
 
         self.save_results(
             predictions, results_file, keys=["energy", "forces", "chunk_idx"]

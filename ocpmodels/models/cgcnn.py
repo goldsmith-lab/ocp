@@ -67,7 +67,7 @@ class CGCNN(BaseModel):
         cutoff=6.0,
         num_gaussians=50,
         latent_layers=[],
-        latent_proc=None,
+        conv_process=None,
     ):
         super(CGCNN, self).__init__(num_atoms, bond_feat_dim, num_targets)
         self.regress_forces = regress_forces
@@ -81,6 +81,7 @@ class CGCNN(BaseModel):
             self.embedding[i] = torch.tensor(KHOT_EMBEDDINGS[i + 1])
         self.embedding_fc = nn.Linear(92, atom_embedding_size)
 
+        self.n_conv_layers = num_graph_conv_layers
         self.convs = nn.ModuleList(
             [
                 CGCNNConv(
@@ -96,18 +97,24 @@ class CGCNN(BaseModel):
             nn.Linear(atom_embedding_size, fc_feat_size), nn.Softplus()
         )
 
+        self.n_fc_layers = num_fc_layers
         if num_fc_layers > 1:
             layers = []
             for _ in range(num_fc_layers - 1):
                 layers.append(nn.Linear(fc_feat_size, fc_feat_size))
                 layers.append(nn.Softplus())
-            self.fcs = nn.Sequential(*layers)
+            # self.fcs = nn.Sequential(*layers)
+            # self.fcs_list = nn.ModuleList(layers)
+            self.fcs = nn.ModuleList(layers)
         self.fc_out = nn.Linear(fc_feat_size, self.num_targets)
 
         self.cutoff = cutoff
         self.distance_expansion = GaussianSmearing(0.0, cutoff, num_gaussians)
-        self.latent_layers = latent_layers
-        self.latent_proc = latent_proc
+        self.latent_layers = []
+        for i_layer in latent_layers:
+            if 0 <= i_layer < self.n_conv_layers + self.n_fc_layers - 1:
+                self.latent_layers.append(i_layer)
+        self.conv_process = conv_process
 
     @conditional_grad(torch.enable_grad())
     def _forward(self, data):
@@ -147,9 +154,22 @@ class CGCNN(BaseModel):
         data.edge_attr = self.distance_expansion(distances)
         # Forward pass through the network
         mol_feats, latent_feats = self._convolve(data)
+        # conv layers defined starting at layer i="0"
         mol_feats = self.conv_to_fc(mol_feats)
+        if self.n_conv_layers in self.latent_layers:
+            latents = mol_feats
+            latent_feats.append(latents)
+
         if hasattr(self, "fcs"):
-            mol_feats = self.fcs(mol_feats)
+            for i in range(self.n_fc_layers - 1):
+                # each subsequent FC layer defined as i="n_conv_layers + 1 + i_fc_layer"
+                linear = self.fcs[i * 2]
+                softplus = self.fcs[i * 2 + 1]
+                mol_feats = linear(mol_feats)
+                mol_feats = softplus(mol_feats)
+                if self.n_conv_layers + 1 + i in self.latent_layers:
+                    latents = mol_feats
+                    latent_feats.append(latents)
 
         energy = self.fc_out(mol_feats)
         return energy, latent_feats
@@ -183,9 +203,9 @@ class CGCNN(BaseModel):
             node_feats = f(node_feats, data.edge_index, data.edge_attr)
             if i in self.latent_layers:
                 latents = node_feats
-                if self.latent_proc:
+                if self.conv_process:
                     latents = torch.split(latents, data.natoms.tolist())
-                    latents = self.latent_proc(latents)
+                    latents = self.conv_process(latents)
                 latent_feats.append(latents)
         mol_feats = global_mean_pool(node_feats, data.batch)
         return mol_feats, latent_feats

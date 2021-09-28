@@ -110,13 +110,22 @@ class CGCNN(BaseModel):
 
         self.cutoff = cutoff
         self.distance_expansion = GaussianSmearing(0.0, cutoff, num_gaussians)
-        self.latent_layers = []
-        for i_layer in latent_layers or []:
-            if 0 <= i_layer < self.n_conv_layers + self.n_fc_layers - 1:
-                self.latent_layers.append(i_layer)
+        self._latent_layers = []
+        self.latent_layers = latent_layers
         if conv_metrics is not None:
             assert callable(conv_metrics)
         self.conv_metrics = conv_metrics
+
+    @property
+    def latent_layers(self):
+        return self._latent_layers
+
+    @latent_layers.setter
+    def latent_layers(self, layers):
+        self._latent_layers = []
+        for i_layer in layers or []:
+            if 0 <= i_layer < self.n_conv_layers + self.n_fc_layers - 1:
+                self._latent_layers.append(i_layer)
 
     @conditional_grad(torch.enable_grad())
     def _forward(self, data):

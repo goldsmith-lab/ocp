@@ -111,7 +111,7 @@ class CGCNN(BaseModel):
         self.cutoff = cutoff
         self.distance_expansion = GaussianSmearing(0.0, cutoff, num_gaussians)
         self.latent_layers = []
-        for i_layer in latent_layers:
+        for i_layer in latent_layers or []:
             if 0 <= i_layer < self.n_conv_layers + self.n_fc_layers - 1:
                 self.latent_layers.append(i_layer)
         if conv_metrics is not None:

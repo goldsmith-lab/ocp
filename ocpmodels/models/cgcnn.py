@@ -155,10 +155,10 @@ class CGCNN(BaseModel):
         # print(data.batch)
         # Forward pass through the network
         mol_feats, latent_feats = self._convolve(data)
-        print(mol_feats.shape)
+        print("_forward post conv", mol_feats.shape)
         # conv layers defined starting at layer i="0"
         mol_feats = self.conv_to_fc(mol_feats)
-        print(mol_feats.shape)
+        print("post conv_to_fc", mol_feats.shape)
         if self.n_conv_layers in self.latent_layers:
             latents = mol_feats
             latent_feats.append(latents)
@@ -174,9 +174,26 @@ class CGCNN(BaseModel):
                     latents = mol_feats
                     latent_feats.append(latents)
 
-        print(mol_feats.shape)
+        print("post fc", mol_feats.shape)
         energy = self.fc_out(mol_feats)
-        print(energy.shape)
+        print("energy", energy.shape)
+
+        def print_shape(arr):
+            try:
+                return str(type(arr)) + " " + str(arr.shape)
+            except AttributeError:
+                return (
+                    str(type(arr))
+                    + " "
+                    + str(len(arr))
+                    + str([_.shape for _ in arr])
+                )
+
+        print(
+            "latents",
+            len(latent_feats),
+            [print_shape(_) for _ in latent_feats],
+        )
         return energy, latent_feats
 
     def forward(self, data):

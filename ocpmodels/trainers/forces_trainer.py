@@ -323,19 +323,48 @@ class ForcesTrainer(BaseTrainer):
                 per_image_forces = [
                     force.numpy() for force in per_image_forces
                 ]
-                print(batch_list)
-                print(batch_natoms)
-                print(len(batch_natoms))
+                # print(batch_list)
+                # print(batch_natoms)
+                # print(len(batch_natoms))
 
                 if "latent" in out:
-                    per_batch_latents = [[]] * len(
-                        batch_natoms
-                    )  # for _ in range(len(batch_natoms))]
-                    print(out["latent"].__len__(), out["latent"][0].__len__())
-                    for i, layer in enumerate(out["latent"]):
-                        for im_num, im_lats in enumerate(layer):
-                            per_batch_latents[i].append(np.array(im_lats))
+                    per_batch_latents = [[] for _ in range(len(batch_natoms))]
+                    print(per_batch_latents)
+                    print(
+                        "out latent len",
+                        out["latent"].__len__(),
+                        "each element length",
+                        out["latent"][0].__len__(),
+                    )
+                    for i, layer in enumerate(
+                        out["latent"]
+                    ):  # for each captured layer
+                        print(
+                            "scatter latent_feats: layer",
+                            i + 1,
+                            "/",
+                            len(out["latent"]),
+                        )
+                        for im_num in range(
+                            len(batch_natoms)
+                        ):  # for each image's info per captured layer
+                            image_latents = np.array(layer[im_num])
+                            print(
+                                "layer",
+                                i,
+                                "image",
+                                im_num,
+                                image_latents.shape,
+                            )
+                            per_batch_latents[im_num].append(image_latents)
+                            print(
+                                "len of each",
+                                [len(_) for _ in per_batch_latents],
+                            )
+                            print(im_num, len(per_batch_latents[im_num]))
+                    print([len(_) for _ in per_batch_latents])
                     predictions["latent"].extend(per_batch_latents)
+                    print([len(_) for _ in predictions["latent"]])
 
                 # evalAI only requires forces on free atoms
                 if results_file is not None:

@@ -67,7 +67,7 @@ class CGCNN(BaseModel):
         cutoff=6.0,
         num_gaussians=50,
         latent_layers=[],
-        conv_process=None,
+        conv_metrics=None,
     ):
         super(CGCNN, self).__init__(num_atoms, bond_feat_dim, num_targets)
         self.regress_forces = regress_forces
@@ -114,7 +114,9 @@ class CGCNN(BaseModel):
         for i_layer in latent_layers:
             if 0 <= i_layer < self.n_conv_layers + self.n_fc_layers - 1:
                 self.latent_layers.append(i_layer)
-        self.conv_process = conv_process
+        if conv_metrics is not None:
+            assert callable(conv_metrics)
+        self.conv_metrics = conv_metrics
 
     @conditional_grad(torch.enable_grad())
     def _forward(self, data):
@@ -151,49 +153,26 @@ class CGCNN(BaseModel):
             row, col = data.edge_index
             distances = (pos[row] - pos[col]).norm(dim=-1)
         data.edge_attr = self.distance_expansion(distances)
-        print("cgcnn data", data)
-        # print(data.batch)
+
         # Forward pass through the network
         mol_feats, latent_feats = self._convolve(data)
-        print("_forward post conv", mol_feats.shape)
         # conv layers defined starting at layer i="0"
+
         mol_feats = self.conv_to_fc(mol_feats)
-        print("post conv_to_fc", mol_feats.shape)
         if self.n_conv_layers in self.latent_layers:
             latents = mol_feats
             latent_feats.append(latents)
 
+        # each subsequent FC layer defined as i="n_conv_layers + 1 + i_fc_layer"
         if hasattr(self, "fcs"):
             for i in range(self.n_fc_layers - 1):
-                # each subsequent FC layer defined as i="n_conv_layers + 1 + i_fc_layer"
                 linear = self.fcs[i * 2]
                 softplus = self.fcs[i * 2 + 1]
-                mol_feats = linear(mol_feats)
-                mol_feats = softplus(mol_feats)
+                mol_feats = softplus(linear(mol_feats))
                 if self.n_conv_layers + 1 + i in self.latent_layers:
                     latents = mol_feats
                     latent_feats.append(latents)
-
-        print("post fc", mol_feats.shape)
         energy = self.fc_out(mol_feats)
-        print("energy", energy.shape)
-
-        def print_shape(arr):
-            try:
-                return str(type(arr)) + " " + str(arr.shape)
-            except AttributeError:
-                return (
-                    str(type(arr))
-                    + " "
-                    + str(len(arr))
-                    + str([_.shape for _ in arr])
-                )
-
-        print(
-            "latents",
-            len(latent_feats),
-            [print_shape(_) for _ in latent_feats],
-        )
         return energy, latent_feats
 
     def forward(self, data):
@@ -220,21 +199,15 @@ class CGCNN(BaseModel):
         into the dense layers.
         """
         node_feats = self.embedding_fc(data.x)
-        print("convolve post embedding node feats", node_feats.shape)
         latent_feats = []
         for i, f in enumerate(self.convs):
-            print(i, "pre conv", node_feats.shape)
             node_feats = f(node_feats, data.edge_index, data.edge_attr)
-            print(i, "post conv", node_feats.shape)
             if i in self.latent_layers:
                 latents = torch.split(node_feats, data.natoms.tolist())
-                print(i, "captured latents", [_.shape for _ in latents])
-                if self.conv_process:
-                    latents = self.conv_process(latents)
-                    print(i, "captured latents post process", latents.shape)
+                if self.conv_metrics:
+                    latents = self.conv_metrics(latents)
                 latent_feats.append(latents)
         mol_feats = global_mean_pool(node_feats, data.batch)
-        print("mean pooled", mol_feats.shape)
         return mol_feats, latent_feats
 
 

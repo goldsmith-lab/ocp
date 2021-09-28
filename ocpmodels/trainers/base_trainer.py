@@ -40,7 +40,7 @@ from ocpmodels.modules.evaluator import Evaluator
 from ocpmodels.modules.exponential_moving_average import (
     ExponentialMovingAverage,
 )
-from ocpmodels.modules.loss import L2MAELoss
+from ocpmodels.modules.loss import DDPLoss, L2MAELoss
 from ocpmodels.modules.normalizer import Normalizer
 from ocpmodels.modules.scheduler import LRScheduler
 
@@ -366,6 +366,8 @@ class BaseTrainer(ABC):
                 raise NotImplementedError(
                     f"Unknown loss function name: {loss_name}"
                 )
+            if distutils.initialized():
+                self.loss_fn[loss] = DDPLoss(self.loss_fn[loss])
 
     def load_optimizer(self):
         optimizer = self.config["optim"].get("optimizer", "AdamW")
@@ -591,10 +593,18 @@ class BaseTrainer(ABC):
         self.optimizer.zero_grad()
         loss.backward()
         # Scale down the gradients of shared parameters
-        if hasattr(self.model, "shared_parameters"):
-            for p, factor in self.model.shared_parameters:
-                if p.grad is not None:
+        if hasattr(self.model.module, "shared_parameters"):
+            for p, factor in self.model.module.shared_parameters:
+                if hasattr(p, "grad") and p.grad is not None:
                     p.grad.detach().div_(factor)
+                else:
+                    if not hasattr(self, "warned_shared_param_no_grad"):
+                        self.warned_shared_param_no_grad = True
+                        logging.warning(
+                            "Some shared parameters do not have a gradient. "
+                            "Please check if all shared parameters are used "
+                            "and point to PyTorch parameters."
+                        )
         if self.clip_grad_norm:
             if self.scaler:
                 self.scaler.unscale_(self.optimizer)

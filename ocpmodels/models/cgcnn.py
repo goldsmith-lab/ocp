@@ -150,12 +150,15 @@ class CGCNN(BaseModel):
             )
             row, col = data.edge_index
             distances = (pos[row] - pos[col]).norm(dim=-1)
-
         data.edge_attr = self.distance_expansion(distances)
+        print("cgcnn data", data)
+        # print(data.batch)
         # Forward pass through the network
         mol_feats, latent_feats = self._convolve(data)
+        print(mol_feats.shape)
         # conv layers defined starting at layer i="0"
         mol_feats = self.conv_to_fc(mol_feats)
+        print(mol_feats.shape)
         if self.n_conv_layers in self.latent_layers:
             latents = mol_feats
             latent_feats.append(latents)
@@ -171,7 +174,9 @@ class CGCNN(BaseModel):
                     latents = mol_feats
                     latent_feats.append(latents)
 
+        print(mol_feats.shape)
         energy = self.fc_out(mol_feats)
+        print(energy.shape)
         return energy, latent_feats
 
     def forward(self, data):
@@ -198,16 +203,21 @@ class CGCNN(BaseModel):
         into the dense layers.
         """
         node_feats = self.embedding_fc(data.x)
+        print("convolve post embedding node feats", node_feats.shape)
         latent_feats = []
         for i, f in enumerate(self.convs):
+            print(i, "pre conv", node_feats.shape)
             node_feats = f(node_feats, data.edge_index, data.edge_attr)
+            print(i, "post conv", node_feats.shape)
             if i in self.latent_layers:
-                latents = node_feats
+                latents = torch.split(node_feats, data.natoms.tolist())
+                print(i, "captured latents", [_.shape for _ in latents])
                 if self.conv_process:
-                    latents = torch.split(latents, data.natoms.tolist())
                     latents = self.conv_process(latents)
+                    print(i, "captured latents post process", latents.shape)
                 latent_feats.append(latents)
         mol_feats = global_mean_pool(node_feats, data.batch)
+        print("mean pooled", mol_feats.shape)
         return mol_feats, latent_feats
 
 

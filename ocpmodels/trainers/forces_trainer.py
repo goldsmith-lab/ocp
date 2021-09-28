@@ -323,12 +323,19 @@ class ForcesTrainer(BaseTrainer):
                 per_image_forces = [
                     force.numpy() for force in per_image_forces
                 ]
+                print(batch_list)
+                print(batch_natoms)
+                print(len(batch_natoms))
+
                 if "latent" in out:
-                    per_image_latents = [[] for _ in range(len(batch_natoms))]
+                    per_batch_latents = [[]] * len(
+                        batch_natoms
+                    )  # for _ in range(len(batch_natoms))]
+                    print(out["latent"].__len__(), out["latent"][0].__len__())
                     for i, layer in enumerate(out["latent"]):
                         for im_num, im_lats in enumerate(layer):
-                            per_image_latents[im_num].append(np.array(im_lats))
-                    predictions["latent"].extend(per_image_latents)
+                            per_batch_latents[i].append(np.array(im_lats))
+                    predictions["latent"].extend(per_batch_latents)
 
                 # evalAI only requires forces on free atoms
                 if results_file is not None:

@@ -124,15 +124,20 @@ class CGCNN(BaseModel):
     def latent_layers(self, layers):
         self._latent_layers = []
         for i_layer in layers or []:
-            if 0 <= i_layer < self.n_conv_layers + self.n_fc_layers - 1:
+            if 0 <= i_layer < self.n_conv_layers + self.n_fc_layers:
                 self._latent_layers.append(i_layer)
 
     @conditional_grad(torch.enable_grad())
     def _forward(self, data):
         # Get node features
+        latent_feats = []
         if self.embedding.device != data.atomic_numbers.device:
             self.embedding = self.embedding.to(data.atomic_numbers.device)
         data.x = self.embedding[data.atomic_numbers.long() - 1]
+
+        if 0 in self.latent_layers:
+            node_feats = torch.split(data.x, data.natoms.tolist())
+            latent_feats.append([_.sum(dim=0) for _ in node_feats])
 
         pos = data.pos
 
@@ -164,11 +169,12 @@ class CGCNN(BaseModel):
         data.edge_attr = self.distance_expansion(distances)
 
         # Forward pass through the network
-        mol_feats, latent_feats = self._convolve(data)
+        mol_feats, _ = self._convolve(data)
+        latent_feats += _
         # conv layers defined starting at layer i="0"
 
         mol_feats = self.conv_to_fc(mol_feats)
-        if self.n_conv_layers in self.latent_layers:
+        if self.n_conv_layers + 1 in self.latent_layers:
             latents = mol_feats
             latent_feats.append(latents)
 
@@ -178,7 +184,7 @@ class CGCNN(BaseModel):
                 linear = self.fcs[i * 2]
                 softplus = self.fcs[i * 2 + 1]
                 mol_feats = softplus(linear(mol_feats))
-                if self.n_conv_layers + 1 + i in self.latent_layers:
+                if self.n_conv_layers + 2 + i in self.latent_layers:
                     latents = mol_feats
                     latent_feats.append(latents)
         energy = self.fc_out(mol_feats)
@@ -207,11 +213,13 @@ class CGCNN(BaseModel):
         Returns the output of the convolution layers before they are passed
         into the dense layers.
         """
-        node_feats = self.embedding_fc(data.x)
         latent_feats = []
+        node_feats = self.embedding_fc(data.x)
         for i, f in enumerate(self.convs):
             node_feats = f(node_feats, data.edge_index, data.edge_attr)
-            if i in self.latent_layers:
+            if (
+                i + 1 in self.latent_layers
+            ):  # 0th layer == embedding aggregation, 1st layer == conv1
                 latents = torch.split(node_feats, data.natoms.tolist())
                 if self.conv_metrics:
                     latents = self.conv_metrics(latents)

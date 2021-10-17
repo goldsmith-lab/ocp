@@ -68,6 +68,7 @@ class CGCNN(BaseModel):
         num_gaussians=50,
         latent_layers=[],
         conv_metrics=None,
+        embeddings=KHOT_EMBEDDINGS,
     ):
         super(CGCNN, self).__init__(num_atoms, bond_feat_dim, num_targets)
         self.regress_forces = regress_forces
@@ -76,10 +77,10 @@ class CGCNN(BaseModel):
         self.otf_graph = otf_graph
 
         # Get CGCNN atom embeddings
-        self.embedding = torch.zeros(100, 92)
+        self.embedding = torch.zeros(100, len(embeddings[1]))
         for i in range(100):
-            self.embedding[i] = torch.tensor(KHOT_EMBEDDINGS[i + 1])
-        self.embedding_fc = nn.Linear(92, atom_embedding_size)
+            self.embedding[i] = torch.tensor(embeddings[i + 1])
+        self.embedding_fc = nn.Linear(len(embeddings[1]), atom_embedding_size)
 
         self.n_conv_layers = num_graph_conv_layers
         self.convs = nn.ModuleList(
